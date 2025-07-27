@@ -7,11 +7,11 @@ import java.util.Arrays;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springdoc.core.models.GroupedOpenApi;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.info.BuildProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.example.cloudconfigpropserver.config.properties.ServletProperties;
 import com.example.cloudconfigpropserver.controller.CertificateController;
 
 import io.swagger.v3.oas.models.info.Contact;
@@ -24,13 +24,13 @@ public class SwaggerConfig {
 
 	private final BuildProperties buildProperties;
 
-	@Autowired
-	public SwaggerConfig(BuildProperties buildProperties) {
-		this.buildProperties = buildProperties;
-	}
+	private final ServletProperties servletProperties;
 
-	@Value("${server.servlet.context-path}")
-	String contextPath;
+	@Autowired
+	public SwaggerConfig(BuildProperties buildProperties, ServletProperties servletProperties) {
+		this.buildProperties = buildProperties;
+		this.servletProperties = servletProperties;
+	}
 
 	@Bean
 	public GroupedOpenApi cloudConfigGroupedOpenApi() {
@@ -40,7 +40,8 @@ public class SwaggerConfig {
 	}
 
 	public OpenApiCustomizer cloudConfigOpenApiCustomiser() {
-		return openApi -> openApi.info(cloudConfigInfo()).servers(Arrays.asList(new Server().url(contextPath)));
+		return openApi -> openApi.info(cloudConfigInfo())
+				.servers(Arrays.asList(new Server().url(servletProperties.contextPath())));
 	}
 
 	private Info cloudConfigInfo() {

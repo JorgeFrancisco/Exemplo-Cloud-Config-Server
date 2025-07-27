@@ -1,8 +1,6 @@
 package com.example.cloudconfigpropserver.config.auth;
 
-import java.util.List;
-
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -14,22 +12,19 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import com.example.cloudconfigpropserver.config.properties.CorsProperties;
+
 @Configuration
 public class SecurityConfiguration {
 
 	private static final String CSP = "default-src 'self' data:";
 
-	@Value("${cors.allowed-methods}")
-	private List<String> allowedMethods;
+	private final CorsProperties corsProperties;
 
-	@Value("${cors.allowed-headers}")
-	private List<String> allowedHeaders;
-
-	@Value("${cors.exposed-headers}")
-	private List<String> exposedHeaders;
-
-	@Value("${cors.allowed-origins}")
-	private List<String> allowedOrigins;
+	@Autowired
+	public SecurityConfiguration(CorsProperties corsProperties) {
+		this.corsProperties = corsProperties;
+	}
 
 	private static final String[] AUTH_WHITELIST = {
 			// @formatter:off
@@ -50,7 +45,7 @@ public class SecurityConfiguration {
 			"/v3/api-docs/**",
 			"/swagger-ui/**",
 			// -- Spring config
-			"/config/encrypt/**",
+			"/config/**",
 			// -- Custom
 			"/certificate/**"
 			// @formatter:on
@@ -76,10 +71,10 @@ public class SecurityConfiguration {
 	public CorsConfigurationSource corsConfigurationSource() {
 		CorsConfiguration corsConfiguration = new CorsConfiguration();
 
-		corsConfiguration.setAllowedMethods(allowedMethods);
-		corsConfiguration.setAllowedHeaders(allowedHeaders);
-		corsConfiguration.setExposedHeaders(exposedHeaders);
-		corsConfiguration.setAllowedOrigins(allowedOrigins);
+		corsConfiguration.setAllowedMethods(corsProperties.allowedMethods());
+		corsConfiguration.setAllowedHeaders(corsProperties.allowedHeaders());
+		corsConfiguration.setExposedHeaders(corsProperties.exposedHeaders());
+		corsConfiguration.setAllowedOrigins(corsProperties.allowedOrigins());
 
 		corsConfiguration.setAllowCredentials(true);
 
