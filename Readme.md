@@ -63,3 +63,17 @@ Para projetos GitOps ou ambientes mais avançados, considere:
 - Sealed Secrets
 - External Secrets Operator
 - Spring Cloud Vault
+
+🔐 Para criptografar dados sensíveis
+
+1) Use o Swagger ou o Postman, envie via POST para o endpoint /certificate o nome da aplicação client (spring.application.name do properties da aplicação client), gere os arquivos dos certificados (pfx) para cada ambiente e o arquivo das senhas dos certificados (claro que não é pra deixar no git esse arquivo né??!!)
+
+2) Copie o certificado para a pasta /certs da aplicação client (aquela que irá consumir o properties):
+<img width="382" height="220" alt="image" src="https://github.com/user-attachments/assets/7ae63cf6-0dcd-4534-9790-3d6d736849ba" />
+
+3) Use o certificado do ambiente, e a senha do ambiente, gerados no passo 1, para criptografar o dado sensível, usando o endpoint /certificate/encrypt no Config Server.
+
+4) Copie o dado criptografado (com o prefixo {cypher} que foi gerado, para o properties da aplicação, e para o ambiente desejado. Lembrando que é o properties que fica no repo dos properties, e não diretamente em qualquer aplicação.
+
+5) Todos os exemplos do uso do dado criptografado se encontram nos meus repositórios
+6) 
