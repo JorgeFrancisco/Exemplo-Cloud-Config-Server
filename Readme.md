@@ -71,9 +71,10 @@ Para projetos GitOps ou ambientes mais avançados, considere:
 2) Copie o certificado para a pasta /certs da aplicação client (aquela que irá consumir o properties):
 <img width="382" height="220" alt="image" src="https://github.com/user-attachments/assets/7ae63cf6-0dcd-4534-9790-3d6d736849ba" />
 
-3) Use o certificado do ambiente, e a senha do ambiente, gerados no passo 1, para criptografar o dado sensível, usando o endpoint /certificate/encrypt no Config Server.
+3) Configure o properties da aplicação client, com o caminho para o certificado, e variável de ambiente com a senha do certificado (não vai colocar a senha diretamente no properties do client né???!!!)
 
-4) Copie o dado criptografado (com o prefixo {cypher} que foi gerado, para o properties da aplicação, e para o ambiente desejado. Lembrando que é o properties que fica no repo dos properties, e não diretamente em qualquer aplicação.
+4) Use o certificado do ambiente, e a senha do ambiente, gerados no passo 1, para criptografar o dado sensível, usando o endpoint /certificate/encrypt no Config Server.
 
-5) Todos os exemplos do uso do dado criptografado se encontram nos meus repositórios
-6) 
+5) Copie o dado criptografado (com o prefixo {cypher} que foi gerado, para o properties da aplicação, e para o ambiente desejado. Lembrando que é o properties que fica no repo dos properties, e não diretamente em qualquer aplicação.
+
+6) Todos os exemplos do uso do dado criptografado se encontram nos meus repositórios
