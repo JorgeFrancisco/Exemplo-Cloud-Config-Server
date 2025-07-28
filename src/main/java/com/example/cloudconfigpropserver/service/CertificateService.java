@@ -1,7 +1,6 @@
 package com.example.cloudconfigpropserver.service;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
@@ -42,7 +41,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.example.cloudconfigpropserver.exception.CertificateGenerationException;
-import com.example.cloudconfigpropserver.model.AppFile;
 import com.example.cloudconfigpropserver.model.CertificateResult;
 import com.example.cloudconfigpropserver.model.Constants;
 
@@ -73,7 +71,8 @@ public class CertificateService {
 
 			var pemFile = pfxService.exportPublicKeyAsPemToAppFile(keyPair.getPublic(), alias + Constants.PEM);
 
-			var pfxFile = createPfxFile(keyPair, password.toCharArray(), alias, x509Cert, alias + Constants.PFX);
+			var pfxFile = pfxService.createPfxFile(keyPair, password.toCharArray(), alias, x509Cert,
+					alias + Constants.PFX);
 
 			return new CertificateResult(pfxFile, pemFile);
 		} catch (NoSuchAlgorithmException | OperatorCreationException | CertificateException | KeyStoreException
@@ -90,26 +89,6 @@ public class CertificateService {
 		}
 
 		return keyStore.aliases();
-	}
-
-	private AppFile createPfxFile(final KeyPair keyPair, final char[] pwChars, final String alias,
-			final X509Certificate x509Cert, final String fileName)
-			throws KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException {
-		final var keystore = KeyStore.getInstance(Constants.PKCS12);
-
-		keystore.load(null, null);
-
-		keystore.setKeyEntry(alias, keyPair.getPrivate(), pwChars, new X509Certificate[] { x509Cert });
-
-		byte[] outputStream;
-
-		try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()) {
-			keystore.store(byteArrayOutputStream, pwChars);
-
-			outputStream = byteArrayOutputStream.toByteArray();
-		}
-
-		return new AppFile(fileName, outputStream);
 	}
 
 	private KeyPair generateKeyPair(final String algorithm, final int keysize) throws NoSuchAlgorithmException {

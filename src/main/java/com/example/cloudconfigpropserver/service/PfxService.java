@@ -1,5 +1,6 @@
 package com.example.cloudconfigpropserver.service;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -11,6 +12,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.Base64;
 import java.util.Optional;
 
@@ -27,6 +29,26 @@ import com.example.cloudconfigpropserver.model.Constants;
 
 @Service
 public class PfxService {
+
+	public AppFile createPfxFile(final KeyPair keyPair, final char[] pwChars, final String alias,
+			final X509Certificate x509Cert, final String fileName)
+			throws KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException {
+		final var keystore = KeyStore.getInstance(Constants.PKCS12);
+
+		keystore.load(null, null);
+
+		keystore.setKeyEntry(alias, keyPair.getPrivate(), pwChars, new X509Certificate[] { x509Cert });
+
+		byte[] outputStream;
+
+		try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()) {
+			keystore.store(byteArrayOutputStream, pwChars);
+
+			outputStream = byteArrayOutputStream.toByteArray();
+		}
+
+		return new AppFile(fileName, outputStream);
+	}
 
 	public String extractAlias(MultipartFile pfxFile) {
 		var filename = Optional.ofNullable(pfxFile.getOriginalFilename())
