@@ -2,7 +2,6 @@ package com.example.cloudconfigpropserver.service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
-import java.security.PublicKey;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
@@ -19,18 +18,18 @@ public class PemService {
 
 	public String encrypt(MultipartFile pemFile, String data) throws CertificateGenerationException {
 		try {
-			String pem = new String(pemFile.getBytes(), StandardCharsets.UTF_8);
+			var pem = new String(pemFile.getBytes(), StandardCharsets.UTF_8);
 
-			String base64 = pem.replace(Constants.BEGIN_PUBLIC_KEY, "").replace(Constants.END_PUBLIC_KEY, "")
+			var base64 = pem.replace(Constants.BEGIN_PUBLIC_KEY, "").replace(Constants.END_PUBLIC_KEY, "")
 					.replaceAll("\\s", "");
 
-			byte[] keyBytes = Base64.getDecoder().decode(base64);
+			var keyBytes = Base64.getDecoder().decode(base64);
 
-			X509EncodedKeySpec keySpec = new X509EncodedKeySpec(keyBytes);
+			var keySpec = new X509EncodedKeySpec(keyBytes);
 
-			KeyFactory keyFactory = KeyFactory.getInstance(Constants.RSA);
+			var keyFactory = KeyFactory.getInstance(Constants.RSA);
 
-			PublicKey publicKey = keyFactory.generatePublic(keySpec);
+			var publicKey = keyFactory.generatePublic(keySpec);
 
 			var encryptor = new RsaSecretEncryptor(publicKey);
 
