@@ -11,7 +11,7 @@
 	</parent>
 	<groupId>com.example</groupId>
 	<artifactId>cloudconfigpropserver</artifactId>
-	<version>0.0.2</version>
+	<version>0.0.3</version>
 	<name>cloudconfigpropserver</name>
 	<description>Exemplo de Cloud Configuration Properties Server</description>
 

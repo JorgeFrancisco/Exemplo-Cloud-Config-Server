@@ -35,7 +35,10 @@ public class GenerateFilesService {
 				String alias = applicationName + "-client-key-" + env;
 				String fileName = alias + ".pfx";
 
-				files.add(certificateService.createCertificate(alias, fileName, password));
+				var result = certificateService.createCertificate(alias, fileName, password);
+
+				files.add(result.pfxFile());
+				files.add(result.pemFile());
 			} catch (Exception e) {
 				String errorMessage = String.format("Erro ao criar certificado da aplicação '%s' para o ambiente '%s'",
 						applicationName, env);

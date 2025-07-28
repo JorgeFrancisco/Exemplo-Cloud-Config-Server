@@ -62,28 +62,47 @@ public class CertificateController {
 		return ResponseEntity.ok().headers(headers).body(responseBody);
 	}
 
-	@Operation(summary = "Criptografa o valor usando o certificado da aplicação para determinado ambiente.", tags = "Certificate", responses = {
+	@Operation(summary = "Criptografa o valor informado usando o certificado pfx da aplicação para determinado ambiente.", tags = "Certificate", responses = {
 			@ApiResponse(responseCode = "200", description = "OK"),
 			@ApiResponse(responseCode = "400", description = "Requisição inválida.", content = @Content),
 			@ApiResponse(responseCode = "403", description = "Proibido acessar este recurso.", content = @Content),
 			@ApiResponse(responseCode = "404", description = "Recurso não encontrado.", content = @Content),
 			@ApiResponse(responseCode = "405", description = "Método HTTP não permitido.", content = @Content),
 			@ApiResponse(responseCode = "500", description = "Erro no servidor.", content = @Content) })
-	@PostMapping(value = "/encrypt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	public ResponseEntity<String> encrypt(
+	@PostMapping(value = "/pfx/encrypt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<String> encryptPfx(
 			@RequestPart("certificate") @Parameter(description = "Certificado .pfx") MultipartFile certificateFile,
 			@RequestPart(name = "certificatePassword") @Parameter(description = "Senha do certificado", required = true) String certificatePassword,
 			@RequestPart(name = "data") @Parameter(description = "Informação para criptografar", required = true) String data)
 			throws EncryptException {
-		String originalFilename = certificateFile.getOriginalFilename();
+		var aliasName = cryptService.extractAliasFromFile(certificateFile, ".pfx");
 
-		if (originalFilename == null || !originalFilename.toLowerCase().endsWith(".pfx")) {
-			return ResponseEntity.badRequest().body("Arquivo inválido ou sem extensão .pfx");
+		var encrypted = cryptService.encrypt(certificateFile, certificatePassword, aliasName, data);
+
+		return ResponseEntity.ok(encrypted);
+	}
+
+	@Operation(summary = "Criptografa o valor informado usando a chave pública da aplicação para determinado ambiente.", tags = "Certificate", responses = {
+			@ApiResponse(responseCode = "200", description = "OK"),
+			@ApiResponse(responseCode = "400", description = "Requisição inválida.", content = @Content),
+			@ApiResponse(responseCode = "403", description = "Proibido acessar este recurso.", content = @Content),
+			@ApiResponse(responseCode = "404", description = "Recurso não encontrado.", content = @Content),
+			@ApiResponse(responseCode = "405", description = "Método HTTP não permitido.", content = @Content),
+			@ApiResponse(responseCode = "500", description = "Erro no servidor.", content = @Content) })
+	@PostMapping(value = "/pem/encrypt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<String> encryptPem(
+			@RequestPart("certificate") @Parameter(description = "Chave pública .pem") MultipartFile pemFile,
+			@RequestPart(name = "data") @Parameter(description = "Informação para criptografar", required = true) String data)
+			throws EncryptException {
+		String originalFilename = pemFile.getOriginalFilename();
+
+		if (originalFilename == null || !originalFilename.toLowerCase().endsWith(".pem")) {
+			return ResponseEntity.badRequest().body("Arquivo inválido ou sem extensão .pem");
 		}
 
-		final var aliasName = originalFilename.substring(0, originalFilename.lastIndexOf('.'));
+		var encrypted = cryptService.encryptWithPem(pemFile, data);
 
-		return ResponseEntity.ok().body(cryptService.encrypt(certificateFile, certificatePassword, aliasName, data));
+		return ResponseEntity.ok(encrypted);
 	}
 
 	@Operation(summary = "Descriptografa o valor usando o certificado da aplicação para determinado ambiente.", tags = "Certificate", responses = {
@@ -97,7 +116,7 @@ public class CertificateController {
 	public ResponseEntity<String> decrypt(
 			@RequestPart("certificate") @Parameter(description = "Certificado .pfx") MultipartFile certificateFile,
 			@RequestPart(name = "certificatePassword") @Parameter(description = "Senha do certificado", required = true) String certificatePassword,
-			@RequestPart(name = "data") @Parameter(description = "Informação para criptografar", required = true) String data)
+			@RequestPart(name = "data") @Parameter(description = "Informação para descriptografar", required = true) String data)
 			throws DecryptException {
 		String originalFilename = certificateFile.getOriginalFilename();
 
@@ -107,16 +126,18 @@ public class CertificateController {
 
 		final var aliasName = originalFilename.substring(0, originalFilename.lastIndexOf('.'));
 
-		return ResponseEntity.ok().body(cryptService.decrypt(certificateFile, certificatePassword, aliasName, data));
+		var decrypted = cryptService.decrypt(certificateFile, certificatePassword, aliasName, data);
+
+		return ResponseEntity.ok(decrypted);
 	}
 
 	private HttpHeaders getDownloadHeaders() {
 		var headers = new HttpHeaders();
 
-		headers.add("Content-Type", "application/zip");
-		headers.add("Content-Disposition", "attachment; filename=download.zip");
-		headers.add("Pragma", "no-cache");
-		headers.add("Cache-Control", "no-cache");
+		headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+		headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=download.zip");
+		headers.setPragma("no-cache");
+		headers.setCacheControl("no-cache");
 
 		return headers;
 	}

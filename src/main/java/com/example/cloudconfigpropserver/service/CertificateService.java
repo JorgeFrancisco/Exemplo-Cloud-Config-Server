@@ -4,17 +4,20 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Security;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.time.ZonedDateTime;
+import java.util.Base64;
 import java.util.Date;
 
 import org.bouncycastle.asn1.ASN1Encoding;
@@ -39,6 +42,7 @@ import org.springframework.stereotype.Service;
 
 import com.example.cloudconfigpropserver.exception.CertificateGenerationException;
 import com.example.cloudconfigpropserver.model.AppFile;
+import com.example.cloudconfigpropserver.model.CertificateResult;
 
 @Service
 public class CertificateService {
@@ -63,26 +67,41 @@ public class CertificateService {
 
 	private static final SecureRandom PRNG = new SecureRandom();
 
-	public AppFile createCertificate(String aliasName, String fileName, String password)
+	public CertificateResult createCertificate(String aliasName, String fileName, String password)
 			throws CertificateGenerationException {
 		try {
 			Security.insertProviderAt(BC_PROVIDER, 1);
 
-			final var keyPair = generateKeyPair(RSA, 4096);
+			final var keyPair = generateKeyPair(RSA, 2048);
 
 			final var x500subject = buildSubjectName();
 
 			final var x509Cert = generateSelfSignedCertificate(keyPair, x500subject, Validity.ofYears(50),
 					SHA512_WITH_RSA);
 
-			return createKeyStoreFile(keyPair, password.toCharArray(), aliasName, x509Cert, fileName);
+			var pemFile = exportPublicKeyAsPem(keyPair.getPublic(), aliasName + ".pem");
+
+			var pfxFile = createKeyStoreFile(keyPair, password.toCharArray(), aliasName, x509Cert, fileName);
+
+			return new CertificateResult(pfxFile, pemFile);
 		} catch (NoSuchAlgorithmException | OperatorCreationException | CertificateException | KeyStoreException
 				| IOException e) {
 			throw new CertificateGenerationException("Erro ao gerar certificado", e);
 		}
 	}
 
-	private static AppFile createKeyStoreFile(final KeyPair keyPair, final char[] pwChars, final String aliasName,
+	private AppFile exportPublicKeyAsPem(PublicKey publicKey, String fileName) {
+		var encoded = publicKey.getEncoded();
+
+		var base64 = Base64.getEncoder().encodeToString(encoded);
+
+		var pem = "-----BEGIN PUBLIC KEY-----\n" + base64.replaceAll("(.{64})", "$1\n")
+				+ "\n-----END PUBLIC KEY-----\n";
+
+		return new AppFile(fileName, pem.getBytes(StandardCharsets.UTF_8));
+	}
+
+	private AppFile createKeyStoreFile(final KeyPair keyPair, final char[] pwChars, final String aliasName,
 			final X509Certificate x509Cert, final String fileName)
 			throws KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException {
 		final var keystore = KeyStore.getInstance(PKCS12);
@@ -102,7 +121,7 @@ public class CertificateService {
 		return new AppFile(fileName, outputStream);
 	}
 
-	private static KeyPair generateKeyPair(final String algorithm, final int keysize) throws NoSuchAlgorithmException {
+	private KeyPair generateKeyPair(final String algorithm, final int keysize) throws NoSuchAlgorithmException {
 		final var keyPairGenerator = KeyPairGenerator.getInstance(algorithm, BC_PROVIDER);
 
 		keyPairGenerator.initialize(keysize, PRNG);
@@ -117,7 +136,7 @@ public class CertificateService {
 						new AttributeTypeAndValue(BCStyle.O, new DERUTF8String(ORGANIZATION)) }) });
 	}
 
-	private static X509Certificate generateSelfSignedCertificate(final KeyPair keyPair, final X500Name subject,
+	private X509Certificate generateSelfSignedCertificate(final KeyPair keyPair, final X500Name subject,
 			final Validity validity, final String signatureAlgorithm)
 			throws IOException, OperatorCreationException, CertificateException {
 		final var sn = new BigInteger(128, PRNG);
@@ -151,7 +170,7 @@ public class CertificateService {
 		}
 	}
 
-	private static final record Validity(Date notBefore, Date notAfter) {
+	private final record Validity(Date notBefore, Date notAfter) {
 		private static Validity ofYears(final int count) {
 			final var zdtNotBefore = ZonedDateTime.now();
 
