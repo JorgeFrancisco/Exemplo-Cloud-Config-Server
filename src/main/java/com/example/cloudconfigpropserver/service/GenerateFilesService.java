@@ -7,6 +7,7 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 
 import com.example.cloudconfigpropserver.model.AppFile;
+import com.example.cloudconfigpropserver.model.Constants;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -24,7 +25,7 @@ public class GenerateFilesService {
 	}
 
 	public List<AppFile> generateFiles(String applicationName) {
-		List<AppFile> files = new ArrayList<>();
+		var files = new ArrayList<AppFile>();
 
 		var passwords = utilService.generatePasswordsByEnvironment();
 
@@ -32,15 +33,14 @@ public class GenerateFilesService {
 
 		passwords.forEach((env, password) -> {
 			try {
-				String alias = applicationName + "-client-key-" + env;
-				String fileName = alias + ".pfx";
+				var alias = applicationName + Constants.CLIENT_KEY + env;
 
-				var result = certificateService.createCertificate(alias, fileName, password);
+				var result = certificateService.createFiles(alias, password);
 
 				files.add(result.pfxFile());
 				files.add(result.pemFile());
 			} catch (Exception e) {
-				String errorMessage = String.format("Erro ao criar certificado da aplicação '%s' para o ambiente '%s'",
+				var errorMessage = String.format("Erro ao gerar os arquivos da aplicação '%s' para o ambiente '%s'",
 						applicationName, env);
 
 				log.error(errorMessage, e);
@@ -53,7 +53,8 @@ public class GenerateFilesService {
 	}
 
 	private AppFile createPasswordFile(Map<String, String> passwords) {
-		StringBuilder builder = new StringBuilder();
+		var builder = new StringBuilder();
+
 		passwords.forEach((env, pass) -> builder.append(env).append("=").append(pass).append("\n"));
 
 		return new AppFile("passwords.txt", builder.toString().getBytes());

@@ -1,5 +1,8 @@
 package com.example.cloudconfigpropserver.controller;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -14,8 +17,11 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 
 import com.example.cloudconfigpropserver.exception.DecryptException;
 import com.example.cloudconfigpropserver.exception.EncryptException;
-import com.example.cloudconfigpropserver.service.CryptService;
+import com.example.cloudconfigpropserver.model.Constants;
+import com.example.cloudconfigpropserver.service.CertificateService;
 import com.example.cloudconfigpropserver.service.GenerateFilesService;
+import com.example.cloudconfigpropserver.service.PemService;
+import com.example.cloudconfigpropserver.service.PfxService;
 import com.example.cloudconfigpropserver.service.UtilService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,19 +37,25 @@ public class CertificateController {
 
 	private final GenerateFilesService generateFilesService;
 
-	private final CryptService cryptService;
-
 	private final UtilService utilService;
 
+	private final CertificateService certificateService;
+
+	private final PfxService pfxService;
+
+	private final PemService pemService;
+
 	@Autowired
-	public CertificateController(GenerateFilesService generateFilesService, CryptService cryptService,
-			UtilService utilService) {
+	public CertificateController(GenerateFilesService generateFilesService, UtilService utilService,
+			CertificateService certificateService, PfxService pfxService, PemService pemService) {
 		this.generateFilesService = generateFilesService;
-		this.cryptService = cryptService;
 		this.utilService = utilService;
+		this.certificateService = certificateService;
+		this.pfxService = pfxService;
+		this.pemService = pemService;
 	}
 
-	@Operation(summary = "Cria os certificados para a aplicação e disponibiliza para download.", tags = "Certificate", responses = {
+	@Operation(summary = "Cria os arquivos para a aplicação, com os certificados, chaves públicas e senhas, e disponibiliza para download.", tags = "Certificate", responses = {
 			@ApiResponse(responseCode = "200", description = "OK"),
 			@ApiResponse(responseCode = "400", description = "Requisição inválida.", content = @Content),
 			@ApiResponse(responseCode = "403", description = "Proibido acessar este recurso.", content = @Content),
@@ -51,18 +63,18 @@ public class CertificateController {
 			@ApiResponse(responseCode = "405", description = "Método HTTP não permitido.", content = @Content),
 			@ApiResponse(responseCode = "500", description = "Erro no servidor.", content = @Content) })
 	@PostMapping
-	public ResponseEntity<StreamingResponseBody> generateCertificate(
+	public ResponseEntity<StreamingResponseBody> generateFiles(
 			@RequestParam(name = "applicationName") @Parameter(description = "Nome da aplicação (spring.application.name do properties da aplicação)", required = true) String applicationName) {
 		var files = generateFilesService.generateFiles(applicationName);
 
 		var responseBody = utilService.generateZipFiles(files);
 
-		var headers = getDownloadHeaders();
+		var headers = getDownloadHeaders("CertificadosEOutros");
 
 		return ResponseEntity.ok().headers(headers).body(responseBody);
 	}
 
-	@Operation(summary = "Criptografa o valor informado usando o certificado pfx da aplicação para determinado ambiente.", tags = "Certificate", responses = {
+	@Operation(summary = "Criptografa o valor informado usando o arquivo pfx da aplicação para determinado ambiente.", tags = "Certificate", responses = {
 			@ApiResponse(responseCode = "200", description = "OK"),
 			@ApiResponse(responseCode = "400", description = "Requisição inválida.", content = @Content),
 			@ApiResponse(responseCode = "403", description = "Proibido acessar este recurso.", content = @Content),
@@ -71,13 +83,13 @@ public class CertificateController {
 			@ApiResponse(responseCode = "500", description = "Erro no servidor.", content = @Content) })
 	@PostMapping(value = "/pfx/encrypt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<String> encryptPfx(
-			@RequestPart("certificate") @Parameter(description = "Certificado .pfx") MultipartFile certificateFile,
-			@RequestPart(name = "certificatePassword") @Parameter(description = "Senha do certificado", required = true) String certificatePassword,
+			@RequestPart("pfxFile") @Parameter(description = "Arquivo .pfx") MultipartFile pfxFile,
+			@RequestPart(name = "password") @Parameter(description = "Senha do arquivo pfx", required = true) String password,
 			@RequestPart(name = "data") @Parameter(description = "Informação para criptografar", required = true) String data)
 			throws EncryptException {
-		var aliasName = cryptService.extractAliasFromFile(certificateFile, ".pfx");
+		var alias = pfxService.extractAlias(pfxFile);
 
-		var encrypted = cryptService.encrypt(certificateFile, certificatePassword, aliasName, data);
+		var encrypted = pfxService.encrypt(pfxFile, password, alias, data);
 
 		return ResponseEntity.ok(encrypted);
 	}
@@ -91,21 +103,21 @@ public class CertificateController {
 			@ApiResponse(responseCode = "500", description = "Erro no servidor.", content = @Content) })
 	@PostMapping(value = "/pem/encrypt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<String> encryptPem(
-			@RequestPart("certificate") @Parameter(description = "Chave pública .pem") MultipartFile pemFile,
+			@RequestPart("pemFile") @Parameter(description = "Chave pública .pem") MultipartFile pemFile,
 			@RequestPart(name = "data") @Parameter(description = "Informação para criptografar", required = true) String data)
 			throws EncryptException {
 		String originalFilename = pemFile.getOriginalFilename();
 
-		if (originalFilename == null || !originalFilename.toLowerCase().endsWith(".pem")) {
+		if (originalFilename == null || !originalFilename.toLowerCase().endsWith(Constants.PEM)) {
 			return ResponseEntity.badRequest().body("Arquivo inválido ou sem extensão .pem");
 		}
 
-		var encrypted = cryptService.encryptWithPem(pemFile, data);
+		var encrypted = pemService.encrypt(pemFile, data);
 
 		return ResponseEntity.ok(encrypted);
 	}
 
-	@Operation(summary = "Descriptografa o valor usando o certificado da aplicação para determinado ambiente.", tags = "Certificate", responses = {
+	@Operation(summary = "Descriptografa o valor usando o arquivo pfx da aplicação para determinado ambiente.", tags = "Certificate", responses = {
 			@ApiResponse(responseCode = "200", description = "OK"),
 			@ApiResponse(responseCode = "400", description = "Requisição inválida.", content = @Content),
 			@ApiResponse(responseCode = "403", description = "Proibido acessar este recurso.", content = @Content),
@@ -114,28 +126,77 @@ public class CertificateController {
 			@ApiResponse(responseCode = "500", description = "Erro no servidor.", content = @Content) })
 	@PostMapping(value = "/decrypt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<String> decrypt(
-			@RequestPart("certificate") @Parameter(description = "Certificado .pfx") MultipartFile certificateFile,
-			@RequestPart(name = "certificatePassword") @Parameter(description = "Senha do certificado", required = true) String certificatePassword,
+			@RequestPart("pfxFile") @Parameter(description = "Arquivo .pfx") MultipartFile pfxFile,
+			@RequestPart(name = "password") @Parameter(description = "Senha do arquivo pfx", required = true) String password,
 			@RequestPart(name = "data") @Parameter(description = "Informação para descriptografar", required = true) String data)
 			throws DecryptException {
-		String originalFilename = certificateFile.getOriginalFilename();
+		String originalFilename = pfxFile.getOriginalFilename();
 
-		if (originalFilename == null || !originalFilename.toLowerCase().endsWith(".pfx")) {
+		if (originalFilename == null || !originalFilename.toLowerCase().endsWith(Constants.PFX)) {
 			return ResponseEntity.badRequest().body("Arquivo inválido ou sem extensão .pfx");
 		}
 
-		final var aliasName = originalFilename.substring(0, originalFilename.lastIndexOf('.'));
+		final var alias = originalFilename.substring(0, originalFilename.lastIndexOf('.'));
 
-		var decrypted = cryptService.decrypt(certificateFile, certificatePassword, aliasName, data);
+		var decrypted = pfxService.decrypt(pfxFile, password, alias, data);
 
 		return ResponseEntity.ok(decrypted);
 	}
 
-	private HttpHeaders getDownloadHeaders() {
+	@Operation(summary = "Exporta a chave pública do arquivo pfx.", tags = "Certificate", responses = {
+			@ApiResponse(responseCode = "200", description = "OK"),
+			@ApiResponse(responseCode = "400", description = "Requisição inválida.", content = @Content),
+			@ApiResponse(responseCode = "403", description = "Proibido acessar este recurso.", content = @Content),
+			@ApiResponse(responseCode = "404", description = "Recurso não encontrado.", content = @Content),
+			@ApiResponse(responseCode = "405", description = "Método HTTP não permitido.", content = @Content),
+			@ApiResponse(responseCode = "500", description = "Erro no servidor.", content = @Content) })
+	@PostMapping(value = "/pfx/public-key/export", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<StreamingResponseBody> exportPublicKeyPfx(
+			@RequestPart("pfxFile") @Parameter(description = "Arquivo .pfx") MultipartFile pfxFile,
+			@RequestPart(name = "password") @Parameter(description = "Senha do arquivo pfx", required = true) String password)
+			throws EncryptException {
+		var alias = pfxService.extractAlias(pfxFile);
+
+		var publicKey = pfxService.exportPublicKeyAsPem(pfxFile, password, alias);
+
+		var responseBody = utilService.generateZipFiles(List.of(publicKey));
+
+		var headers = getDownloadHeaders("ChavePublica");
+
+		return ResponseEntity.ok().headers(headers).body(responseBody);
+	}
+
+	@Operation(summary = "Lista os aliases do arquivo pfx.", tags = "Certificate", responses = {
+			@ApiResponse(responseCode = "200", description = "OK"),
+			@ApiResponse(responseCode = "400", description = "Requisição inválida.", content = @Content),
+			@ApiResponse(responseCode = "403", description = "Proibido acessar este recurso.", content = @Content),
+			@ApiResponse(responseCode = "404", description = "Recurso não encontrado.", content = @Content),
+			@ApiResponse(responseCode = "405", description = "Método HTTP não permitido.", content = @Content),
+			@ApiResponse(responseCode = "500", description = "Erro no servidor.", content = @Content) })
+	@PostMapping(value = "/pfx/list-aliases", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<List<String>> listAliases(
+			@RequestPart("pfxFile") @Parameter(description = "Arquivo .pfx") MultipartFile pfxFile,
+			@RequestPart(name = "password") @Parameter(description = "Senha do arquivo pfx", required = true) String password) {
+		try {
+			var aliases = certificateService.listAliases(pfxFile, password);
+
+			var aliasList = new ArrayList<String>();
+
+			while (aliases.hasMoreElements()) {
+				aliasList.add(aliases.nextElement());
+			}
+
+			return ResponseEntity.ok(aliasList);
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().build();
+		}
+	}
+
+	private HttpHeaders getDownloadHeaders(String fileName) {
 		var headers = new HttpHeaders();
 
 		headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-		headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=download.zip");
+		headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + fileName + Constants.ZIP);
 		headers.setPragma("no-cache");
 		headers.setCacheControl("no-cache");
 

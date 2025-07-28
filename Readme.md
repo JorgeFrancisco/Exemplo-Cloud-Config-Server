@@ -75,6 +75,6 @@ Para projetos GitOps ou ambientes mais avançados, considere:
 
 4) Use o certificado do ambiente, e a senha do ambiente, gerados no passo 1, para criptografar o dado sensível, usando o endpoint /certificate/encrypt no Config Server.
 
-5) Copie o dado criptografado (com o prefixo {cypher} que foi gerado, para o properties da aplicação, e para o ambiente desejado. Lembrando que é o properties que fica no repo dos properties, e não diretamente em qualquer aplicação.
+5) Copie o dado criptografado (com o prefixo {cipher}) que foi gerado, para o properties da aplicação, e para o ambiente desejado. Lembrando que é o properties que fica no repo dos properties, e não diretamente em qualquer aplicação.
 
 6) Todos os exemplos do uso do dado criptografado se encontram nos meus repositórios

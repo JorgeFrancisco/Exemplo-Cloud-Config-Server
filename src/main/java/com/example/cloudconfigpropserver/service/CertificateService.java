@@ -3,22 +3,21 @@ package com.example.cloudconfigpropserver.service;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
-import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Security;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.time.ZonedDateTime;
-import java.util.Base64;
 import java.util.Date;
+import java.util.Enumeration;
 
 import org.bouncycastle.asn1.ASN1Encoding;
 import org.bouncycastle.asn1.ASN1InputStream;
@@ -38,77 +37,69 @@ import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.example.cloudconfigpropserver.exception.CertificateGenerationException;
 import com.example.cloudconfigpropserver.model.AppFile;
 import com.example.cloudconfigpropserver.model.CertificateResult;
+import com.example.cloudconfigpropserver.model.Constants;
 
 @Service
 public class CertificateService {
-
-	private static final String RSA = "RSA";
-
-	private static final String SHA512_WITH_RSA = "SHA512WithRSA";
-
-	private static final String PKCS12 = "PKCS12";
-
-	private static final String DOMAIN = "*.jfbm.tech.br";
-
-	private static final String PROJECT = "Examples";
-
-	private static final String ORGANIZATION = "JFBM";
-
-	private static final String IP = "127.0.0.1";
-
-	private static final String DNS = "jfbm.tech.br";
 
 	private static final BouncyCastleProvider BC_PROVIDER = new BouncyCastleProvider();
 
 	private static final SecureRandom PRNG = new SecureRandom();
 
-	public CertificateResult createCertificate(String aliasName, String fileName, String password)
-			throws CertificateGenerationException {
+	private final PfxService pfxService;
+
+	@Autowired
+	public CertificateService(PfxService pfxService) {
+		this.pfxService = pfxService;
+	}
+
+	public CertificateResult createFiles(String alias, String password) throws CertificateGenerationException {
 		try {
 			Security.insertProviderAt(BC_PROVIDER, 1);
 
-			final var keyPair = generateKeyPair(RSA, 2048);
+			final var keyPair = generateKeyPair(Constants.RSA, 2048);
 
 			final var x500subject = buildSubjectName();
 
 			final var x509Cert = generateSelfSignedCertificate(keyPair, x500subject, Validity.ofYears(50),
-					SHA512_WITH_RSA);
+					Constants.SHA512_WITH_RSA);
 
-			var pemFile = exportPublicKeyAsPem(keyPair.getPublic(), aliasName + ".pem");
+			var pemFile = pfxService.exportPublicKeyAsPemToAppFile(keyPair.getPublic(), alias + Constants.PEM);
 
-			var pfxFile = createKeyStoreFile(keyPair, password.toCharArray(), aliasName, x509Cert, fileName);
+			var pfxFile = createPfxFile(keyPair, password.toCharArray(), alias, x509Cert, alias + Constants.PFX);
 
 			return new CertificateResult(pfxFile, pemFile);
 		} catch (NoSuchAlgorithmException | OperatorCreationException | CertificateException | KeyStoreException
 				| IOException e) {
-			throw new CertificateGenerationException("Erro ao gerar certificado", e);
+			throw new CertificateGenerationException("Erro ao gerar os arquivos", e);
 		}
 	}
 
-	private AppFile exportPublicKeyAsPem(PublicKey publicKey, String fileName) {
-		var encoded = publicKey.getEncoded();
+	public Enumeration<String> listAliases(MultipartFile pfxFile, String password) throws Exception {
+		var keyStore = KeyStore.getInstance(Constants.PKCS12);
 
-		var base64 = Base64.getEncoder().encodeToString(encoded);
+		try (InputStream inputStream = pfxFile.getInputStream()) {
+			keyStore.load(inputStream, password.toCharArray());
+		}
 
-		var pem = "-----BEGIN PUBLIC KEY-----\n" + base64.replaceAll("(.{64})", "$1\n")
-				+ "\n-----END PUBLIC KEY-----\n";
-
-		return new AppFile(fileName, pem.getBytes(StandardCharsets.UTF_8));
+		return keyStore.aliases();
 	}
 
-	private AppFile createKeyStoreFile(final KeyPair keyPair, final char[] pwChars, final String aliasName,
+	private AppFile createPfxFile(final KeyPair keyPair, final char[] pwChars, final String alias,
 			final X509Certificate x509Cert, final String fileName)
 			throws KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException {
-		final var keystore = KeyStore.getInstance(PKCS12);
+		final var keystore = KeyStore.getInstance(Constants.PKCS12);
 
 		keystore.load(null, null);
 
-		keystore.setKeyEntry(aliasName, keyPair.getPrivate(), pwChars, new X509Certificate[] { x509Cert });
+		keystore.setKeyEntry(alias, keyPair.getPrivate(), pwChars, new X509Certificate[] { x509Cert });
 
 		byte[] outputStream;
 
@@ -130,10 +121,10 @@ public class CertificateService {
 	}
 
 	private static X500Name buildSubjectName() {
-		return new X500Name(new RDN[] {
-				new RDN(new AttributeTypeAndValue[] { new AttributeTypeAndValue(BCStyle.CN, new DERUTF8String(DOMAIN)),
-						new AttributeTypeAndValue(BCStyle.OU, new DERUTF8String(PROJECT)),
-						new AttributeTypeAndValue(BCStyle.O, new DERUTF8String(ORGANIZATION)) }) });
+		return new X500Name(new RDN[] { new RDN(new AttributeTypeAndValue[] {
+				new AttributeTypeAndValue(BCStyle.CN, new DERUTF8String(Constants.DOMAIN)),
+				new AttributeTypeAndValue(BCStyle.OU, new DERUTF8String(Constants.PROJECT)),
+				new AttributeTypeAndValue(BCStyle.O, new DERUTF8String(Constants.ORGANIZATION)) }) });
 	}
 
 	private X509Certificate generateSelfSignedCertificate(final KeyPair keyPair, final X500Name subject,
@@ -158,8 +149,9 @@ public class CertificateService {
 
 			final var contentSigner = new JcaContentSignerBuilder(signatureAlgorithm).build(keyPair.getPrivate());
 
-			final var generalNamesBuilder = new GeneralNamesBuilder().addName(new GeneralName(GeneralName.dNSName, DNS))
-					.addName(new GeneralName(GeneralName.iPAddress, IP));
+			final var generalNamesBuilder = new GeneralNamesBuilder()
+					.addName(new GeneralName(GeneralName.dNSName, Constants.DNS))
+					.addName(new GeneralName(GeneralName.iPAddress, Constants.IP));
 
 			final var certHolder = certBuilder.addExtension(Extension.subjectKeyIdentifier, false, subjectPublicKeyId)
 					.addExtension(Extension.subjectAlternativeName, false,
@@ -171,6 +163,7 @@ public class CertificateService {
 	}
 
 	private final record Validity(Date notBefore, Date notAfter) {
+
 		private static Validity ofYears(final int count) {
 			final var zdtNotBefore = ZonedDateTime.now();
 
