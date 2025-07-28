@@ -73,7 +73,7 @@ Para projetos GitOps ou ambientes mais avançados, considere:
 
 3) Configure o properties da aplicação client, com o caminho para o certificado, e variável de ambiente com a senha do certificado (não vai colocar a senha diretamente no properties do client né???!!!)
 
-4) Use o certificado do ambiente, e a senha do ambiente, gerados no passo 1, para criptografar o dado sensível, usando o endpoint /certificate/encrypt no Config Server.
+4) Use o certificado do ambiente, e a senha do ambiente, gerados no passo 1, para criptografar o dado sensível, usando o endpoint /certificate/pfx/encrypt no Config Server. Ou use somente a chave pública gerada no passo 1, no endpoint /certificate/pem/encrypt.
 
 5) Copie o dado criptografado (com o prefixo {cipher}) que foi gerado, para o properties da aplicação, e para o ambiente desejado. Lembrando que é o properties que fica no repo dos properties, e não diretamente em qualquer aplicação.
 
