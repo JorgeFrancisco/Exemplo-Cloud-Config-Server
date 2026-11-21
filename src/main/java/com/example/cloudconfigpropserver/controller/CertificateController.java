@@ -1,11 +1,13 @@
 package com.example.cloudconfigpropserver.controller;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -18,6 +20,7 @@ import com.example.cloudconfigpropserver.model.Constants;
 import com.example.cloudconfigpropserver.service.GenerateFilesService;
 import com.example.cloudconfigpropserver.service.PemService;
 import com.example.cloudconfigpropserver.service.PfxService;
+import com.example.cloudconfigpropserver.service.PublicKeyCatalogService;
 import com.example.cloudconfigpropserver.service.UtilService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,13 +42,25 @@ public class CertificateController {
 
 	private final PemService pemService;
 
+	private final PublicKeyCatalogService publicKeyCatalogService;
+
 	@Autowired
 	public CertificateController(GenerateFilesService generateFilesService, UtilService utilService,
-			PfxService pfxService, PemService pemService) {
+			PfxService pfxService, PemService pemService, PublicKeyCatalogService publicKeyCatalogService) {
 		this.generateFilesService = generateFilesService;
 		this.utilService = utilService;
 		this.pfxService = pfxService;
 		this.pemService = pemService;
+		this.publicKeyCatalogService = publicKeyCatalogService;
+	}
+
+	@Operation(summary = "Lista as aplicações e os ambientes que possuem chave pública (.pem) no repositório de properties,"
+			+ " ou seja, os que podem ser usados no /certificate/encrypt.", tags = "Certificate", responses = {
+			@ApiResponse(responseCode = "200", description = "OK"),
+			@ApiResponse(responseCode = "500", description = "Erro no servidor.", content = @Content) })
+	@GetMapping("/applications")
+	public ResponseEntity<Map<String, List<String>>> listApplications() {
+		return ResponseEntity.ok(publicKeyCatalogService.listApplications());
 	}
 
 	@Operation(summary = "Cria os arquivos para a aplicação, com os certificados, chaves públicas e senhas, e disponibiliza para download.", tags = "Certificate", responses = {

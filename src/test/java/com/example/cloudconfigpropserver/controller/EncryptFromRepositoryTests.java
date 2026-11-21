@@ -23,6 +23,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.encrypt.RsaSecretEncryptor;
+import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -60,6 +61,16 @@ class EncryptFromRepositoryTests {
 
 		Files.writeString(pasta.resolve("application.properties"), "app.name=Teste\n");
 		Files.write(pasta.resolve(ALIAS + ".pem"), certificate.pemFile().getContent());
+
+		// Outra aplicacao, com chave publica so em production, e uma aplicacao sem chave publica
+		Path outra = Files.createDirectories(repo.resolve("properties/outra/production"));
+		Files.writeString(outra.resolve("application.properties"), "app.name=Outra\n");
+		Files.write(outra.resolve("outra-client-key-production.pem"), certificate.pemFile().getContent());
+		Files.createDirectories(repo.resolve("properties/outra/staging"));
+		Files.writeString(repo.resolve("properties/outra/staging/application.properties"), "app.name=Outra\n");
+
+		Path semChave = Files.createDirectories(repo.resolve("properties/sem-chave/development"));
+		Files.writeString(semChave.resolve("application.properties"), "app.name=SemChave\n");
 
 		try (var git = Git.init().setDirectory(repo.toFile()).setInitialBranch("main").call()) {
 			git.add().addFilepattern(".").call();
@@ -115,6 +126,24 @@ class EncryptFromRepositoryTests {
 				.andExpect(jsonPath("$.propertySources.length()").value(1))
 				.andExpect(jsonPath("$.propertySources[0].name").value(Matchers.endsWith("application.properties")))
 				.andExpect(jsonPath("$.propertySources[0].source['app.name']").value("Teste"));
+	}
+
+	@Test
+	void deveListarSomenteAplicacoesEAmbientesComChavePublica() throws Exception {
+		mockMvc.perform(get("/certificate/applications")).andExpect(status().isOk())
+				.andExpect(content().json("{\"app\":[\"development\"],\"outra\":[\"production\"]}", JsonCompareMode.STRICT));
+	}
+
+	@Test
+	void devePreencherAsOpcoesDoSwagger() throws Exception {
+		var form = "$.paths['/certificate/encrypt'].post.requestBody.content['multipart/form-data'].schema.properties";
+
+		mockMvc.perform(get("/v3/api-docs/Spring Cloud Config")).andExpect(status().isOk())
+				.andExpect(jsonPath(form + ".applicationName.enum").value(Matchers.contains("app", "outra")))
+				.andExpect(jsonPath(form + ".profile.enum").value(Matchers.contains("development", "production")))
+				.andExpect(jsonPath(form + ".label.default").value("main"))
+				.andExpect(jsonPath("$.paths['/certificate/encrypt'].post.description")
+						.value(Matchers.containsString("app (development); outra (production)")));
 	}
 
 	private static MockMultipartHttpServletRequestBuilder encrypt(String app, String profile, String label) {
