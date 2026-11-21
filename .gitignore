@@ -36,3 +36,11 @@ build/
 # O POST /certificate do Config Server gera um passwords.txt com as senhas dos certificados.
 # Ignorar *.txt evita que ele seja commitado por acidente (as senhas ficam somente nos secrets).
 *.txt
+
+### Chaves privadas ###
+# Os certificados (pfx) com a chave privada ficam somente em cada aplicacao client. Aqui so podem
+# ficar as chaves publicas (.pem).
+*.pfx
+*.p12
+*.jks
+*.key
