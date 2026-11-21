@@ -1,6 +1,6 @@
-📌 Spring Cloud Config - Centralizando Configurações (Java 8+)
+📌 Spring Cloud Config - Centralizando Configurações (Java 21+)
 
-Em um exemplo anterior apresentei boas práticas com @ConfigurationProperties no Spring Boot (Java 17+), neste, abordo um pouco sobre Spring Cloud Config
+Em um exemplo anterior apresentei boas práticas com @ConfigurationProperties no Spring Boot (Java 21+), neste, abordo um pouco sobre Spring Cloud Config
 
 
 🚀 O que é o Spring Cloud Config?
