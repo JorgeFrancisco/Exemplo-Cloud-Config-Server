@@ -54,8 +54,10 @@ public class SecurityConfiguration {
 
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+		// X-XSS-Protection: 0 desliga o filtro XSS legado dos navegadores, que podia ser explorado
+		// e ja foi removido dos navegadores atuais. A protecao contra XSS fica a cargo do CSP.
 		http.csrf(AbstractHttpConfigurer::disable)
-				.headers(headers -> headers.xssProtection(xss -> xss.headerValue(HeaderValue.ENABLED_MODE_BLOCK))
+				.headers(headers -> headers.xssProtection(xss -> xss.headerValue(HeaderValue.DISABLED))
 						.contentSecurityPolicy(cps -> cps.policyDirectives(CSP)));
 
 		http.cors(
