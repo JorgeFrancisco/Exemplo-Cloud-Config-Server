@@ -2,11 +2,9 @@ package com.example.cloudconfigpropserver.service;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.math.BigInteger;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
-import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -16,7 +14,6 @@ import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.Date;
-import java.util.Enumeration;
 
 import org.bouncycastle.asn1.ASN1Encoding;
 import org.bouncycastle.asn1.ASN1InputStream;
@@ -38,7 +35,6 @@ import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import com.example.cloudconfigpropserver.exception.CertificateGenerationException;
 import com.example.cloudconfigpropserver.model.CertificateResult;
@@ -79,16 +75,6 @@ public class CertificateService {
 				| IOException e) {
 			throw new CertificateGenerationException("Erro ao gerar os arquivos", e);
 		}
-	}
-
-	public Enumeration<String> listAliases(MultipartFile pfxFile, String password) throws Exception {
-		var keyStore = KeyStore.getInstance(Constants.PKCS12);
-
-		try (InputStream inputStream = pfxFile.getInputStream()) {
-			keyStore.load(inputStream, password.toCharArray());
-		}
-
-		return keyStore.aliases();
 	}
 
 	private KeyPair generateKeyPair(final String algorithm, final int keysize) throws NoSuchAlgorithmException {

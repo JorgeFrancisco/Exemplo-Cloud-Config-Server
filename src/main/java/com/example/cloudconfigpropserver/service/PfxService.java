@@ -8,20 +8,17 @@ import java.security.KeyPair;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Base64;
-import java.util.Optional;
+import java.util.Collections;
+import java.util.List;
 
-import org.springframework.security.crypto.encrypt.RsaSecretEncryptor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.example.cloudconfigpropserver.exception.CertificateGenerationException;
-import com.example.cloudconfigpropserver.exception.EncryptException;
+import com.example.cloudconfigpropserver.exception.InvalidFileException;
 import com.example.cloudconfigpropserver.exception.PublicKeyGenerationException;
 import com.example.cloudconfigpropserver.model.AppFile;
 import com.example.cloudconfigpropserver.model.Constants;
@@ -49,26 +46,11 @@ public class PfxService {
 		return new AppFile(fileName, outputStream);
 	}
 
-	public String extractAlias(MultipartFile pfxFile) {
-		var filename = Optional.ofNullable(pfxFile.getOriginalFilename())
-				.orElseThrow(() -> new IllegalArgumentException("Arquivo sem nome"));
-
-		if (!filename.toLowerCase().endsWith(Constants.PFX)) {
-			throw new IllegalArgumentException("Arquivo deve ter extensão " + Constants.PFX);
-		}
-
-		return filename.substring(0, filename.lastIndexOf('.'));
-	}
-
-	public String encrypt(MultipartFile pfxFile, String pfxPassword, String alias, String data)
-			throws CertificateGenerationException {
+	public List<String> listAliases(MultipartFile pfxFile, String password) {
 		try {
-			var encryptor = getEncryptor(pfxFile, pfxPassword, alias);
-
-			return Constants.CIPHER + encryptor.encrypt(data);
-		} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException | CertificateException
-				| IOException e) {
-			throw new EncryptException("Erro ao criptografar a informação", e);
+			return Collections.list(loadKeyStore(pfxFile, password).aliases());
+		} catch (KeyStoreException e) {
+			throw new PublicKeyGenerationException("Erro ao listar os aliases do arquivo pfx", e);
 		}
 	}
 
@@ -78,12 +60,26 @@ public class PfxService {
 		return new AppFile(fileName, pem.getBytes(StandardCharsets.UTF_8));
 	}
 
-	public AppFile exportPublicKeyAsPem(MultipartFile pfxFile, String password, String alias) {
-		PublicKey publicKey = extractPublicKey(pfxFile, password, alias);
+	/**
+	 * Exporta a chave publica do pfx. O alias e lido de dentro do keystore, entao o nome do
+	 * arquivo enviado nao importa.
+	 */
+	public AppFile exportPublicKeyAsPem(MultipartFile pfxFile, String password) {
+		try {
+			var keyStore = loadKeyStore(pfxFile, password);
 
-		var pem = exportPublicKeyAsPem(publicKey);
+			var alias = resolveAlias(keyStore);
 
-		return new AppFile(alias + Constants.PEM, pem.getBytes(StandardCharsets.UTF_8));
+			var cert = keyStore.getCertificate(alias);
+
+			if (cert == null) {
+				throw new InvalidFileException("O alias '" + alias + "' do arquivo pfx não possui certificado");
+			}
+
+			return exportPublicKeyAsPemToAppFile(cert.getPublicKey(), alias + Constants.PEM);
+		} catch (KeyStoreException e) {
+			throw new PublicKeyGenerationException("Erro ao extrair a chave pública", e);
+		}
 	}
 
 	private String exportPublicKeyAsPem(PublicKey publicKey) {
@@ -99,7 +95,7 @@ public class PfxService {
 		return pem.toString();
 	}
 
-	private PublicKey extractPublicKey(MultipartFile pfxFile, String password, String alias) {
+	private KeyStore loadKeyStore(MultipartFile pfxFile, String password) {
 		try {
 			var keyStore = KeyStore.getInstance(Constants.PKCS12);
 
@@ -107,37 +103,30 @@ public class PfxService {
 				keyStore.load(inputStream, password.toCharArray());
 			}
 
-			if (!keyStore.containsAlias(alias)) {
-				throw new IllegalArgumentException("Alias não encontrado: " + alias);
-			}
-
-			var cert = keyStore.getCertificate(alias);
-
-			if (cert == null) {
-				throw new IllegalArgumentException("Certificado não encontrado para alias: " + alias);
-			}
-
-			return cert.getPublicKey();
-		} catch (KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException e) {
-			throw new PublicKeyGenerationException("Erro ao extrair a chave pública", e);
+			return keyStore;
+		} catch (IOException | CertificateException e) {
+			// O PKCS12 informa senha incorreta e arquivo corrompido com a mesma IOException
+			throw new InvalidFileException("Arquivo pfx inválido ou senha incorreta", e);
+		} catch (KeyStoreException | NoSuchAlgorithmException e) {
+			throw new PublicKeyGenerationException("Erro ao abrir o arquivo pfx", e);
 		}
 	}
 
-	private RsaSecretEncryptor getEncryptor(MultipartFile pfxFile, String pfxPassword, String alias)
-			throws KeyStoreException, IOException, NoSuchAlgorithmException, CertificateException,
-			UnrecoverableKeyException {
-		var keystore = KeyStore.getInstance(Constants.PKCS12);
+	/**
+	 * Os pfx gerados pelo endpoint /certificate possuem um unico alias. Se houver mais de um,
+	 * nao ha como saber qual usar, entao a requisicao e recusada.
+	 */
+	private String resolveAlias(KeyStore keyStore) throws KeyStoreException {
+		var aliases = Collections.list(keyStore.aliases());
 
-		try (var fis = pfxFile.getInputStream()) {
-			keystore.load(fis, pfxPassword.toCharArray());
+		if (aliases.isEmpty()) {
+			throw new InvalidFileException("O arquivo pfx não possui nenhum alias");
 		}
 
-		var privateKey = (PrivateKey) keystore.getKey(alias, pfxPassword.toCharArray());
+		if (aliases.size() > 1) {
+			throw new InvalidFileException("O arquivo pfx possui mais de um alias: " + String.join(", ", aliases));
+		}
 
-		var cert = keystore.getCertificate(alias);
-
-		var keyPair = new KeyPair(cert.getPublicKey(), privateKey);
-
-		return new RsaSecretEncryptor(keyPair);
+		return aliases.get(0);
 	}
 }
