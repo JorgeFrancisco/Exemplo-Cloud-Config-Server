@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
-import com.example.cloudconfigpropserver.exception.DecryptException;
 import com.example.cloudconfigpropserver.exception.EncryptException;
 import com.example.cloudconfigpropserver.model.Constants;
 import com.example.cloudconfigpropserver.service.CertificateService;
@@ -115,32 +114,6 @@ public class CertificateController {
 		var encrypted = pemService.encrypt(pemFile, data);
 
 		return ResponseEntity.ok(encrypted);
-	}
-
-	@Operation(summary = "Descriptografa o valor usando o arquivo pfx da aplicação para determinado ambiente.", tags = "Certificate", responses = {
-			@ApiResponse(responseCode = "200", description = "OK"),
-			@ApiResponse(responseCode = "400", description = "Requisição inválida.", content = @Content),
-			@ApiResponse(responseCode = "403", description = "Proibido acessar este recurso.", content = @Content),
-			@ApiResponse(responseCode = "404", description = "Recurso não encontrado.", content = @Content),
-			@ApiResponse(responseCode = "405", description = "Método HTTP não permitido.", content = @Content),
-			@ApiResponse(responseCode = "500", description = "Erro no servidor.", content = @Content) })
-	@PostMapping(value = "/decrypt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	public ResponseEntity<String> decrypt(
-			@RequestPart("pfxFile") @Parameter(description = "Arquivo .pfx") MultipartFile pfxFile,
-			@RequestPart(name = "password") @Parameter(description = "Senha do arquivo pfx", required = true) String password,
-			@RequestPart(name = "data") @Parameter(description = "Informação para descriptografar", required = true) String data)
-			throws DecryptException {
-		String originalFilename = pfxFile.getOriginalFilename();
-
-		if (originalFilename == null || !originalFilename.toLowerCase().endsWith(Constants.PFX)) {
-			return ResponseEntity.badRequest().body("Arquivo inválido ou sem extensão .pfx");
-		}
-
-		final var alias = originalFilename.substring(0, originalFilename.lastIndexOf('.'));
-
-		var decrypted = pfxService.decrypt(pfxFile, password, alias, data);
-
-		return ResponseEntity.ok(decrypted);
 	}
 
 	@Operation(summary = "Exporta a chave pública do arquivo pfx.", tags = "Certificate", responses = {

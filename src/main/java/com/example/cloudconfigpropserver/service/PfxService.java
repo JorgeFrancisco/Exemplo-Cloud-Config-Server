@@ -21,7 +21,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.example.cloudconfigpropserver.exception.CertificateGenerationException;
-import com.example.cloudconfigpropserver.exception.DecryptException;
 import com.example.cloudconfigpropserver.exception.EncryptException;
 import com.example.cloudconfigpropserver.exception.PublicKeyGenerationException;
 import com.example.cloudconfigpropserver.model.AppFile;
@@ -70,20 +69,6 @@ public class PfxService {
 		} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException | CertificateException
 				| IOException e) {
 			throw new EncryptException("Erro ao criptografar a informação", e);
-		}
-	}
-
-	public String decrypt(MultipartFile pfxFile, String pfxPassword, String alias, String encryptedData)
-			throws CertificateGenerationException {
-		try {
-			var encryptor = getEncryptor(pfxFile, pfxPassword, alias);
-
-			var dataToDecrypt = removeCipherPrefix(encryptedData);
-
-			return encryptor.decrypt(dataToDecrypt);
-		} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException | CertificateException
-				| IOException e) {
-			throw new DecryptException("Erro ao descriptografar a informação", e);
 		}
 	}
 
@@ -136,11 +121,6 @@ public class PfxService {
 		} catch (KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException e) {
 			throw new PublicKeyGenerationException("Erro ao extrair a chave pública", e);
 		}
-	}
-
-	private String removeCipherPrefix(String encryptedData) {
-		return encryptedData.startsWith(Constants.CIPHER) ? encryptedData.substring(Constants.CIPHER.length())
-				: encryptedData;
 	}
 
 	private RsaSecretEncryptor getEncryptor(MultipartFile pfxFile, String pfxPassword, String alias)

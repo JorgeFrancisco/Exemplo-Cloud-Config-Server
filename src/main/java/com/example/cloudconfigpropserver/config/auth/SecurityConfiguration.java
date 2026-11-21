@@ -26,23 +26,24 @@ public class SecurityConfiguration {
 		this.corsProperties = corsProperties;
 	}
 
+	/**
+	 * Endpoints bloqueados. Precisam ser declarados antes da whitelist, porque o
+	 * Spring Security aplica a primeira regra que casar com a requisicao (e
+	 * "/config/**" da whitelist tambem casaria com "/config/decrypt").
+	 */
+	private static final String[] DENY_LIST = {
+			// @formatter:off
+			"/config/decrypt",
+			"/config/decrypt/**"
+			// @formatter:on
+	};
+
 	private static final String[] AUTH_WHITELIST = {
 			// @formatter:off
-			"/**.html",
-			"/configuration/**",
-			"/h2-console/**",
-			"/actuator/**",
-			"/",
-			// -- Swagger UI v2
-			"/v2/api-docs",
-			"/swagger-resources",
-			"/swagger-resources/**",
-			"/configuration/ui",
-			"/configuration/security",
-			"/swagger-ui.html",
-			"/webjars/**",
+			"/error",
 			// -- Swagger UI v3 (OpenAPI)
 			"/v3/api-docs/**",
+			"/swagger-ui.html",
 			"/swagger-ui/**",
 			// -- Spring config
 			"/config/**",
@@ -60,11 +61,13 @@ public class SecurityConfiguration {
 		http.cors(
 				httpSecurityCorsConfigurer -> httpSecurityCorsConfigurer.configurationSource(corsConfigurationSource()))
 				.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-				.authorizeHttpRequests(authorizeRequests -> authorizeRequests.requestMatchers(AUTH_WHITELIST)
-						.permitAll().requestMatchers("/config/decrypt/**").denyAll());
+				.authorizeHttpRequests(authorizeRequests -> authorizeRequests
+						.requestMatchers(DENY_LIST).denyAll()
+						.requestMatchers(AUTH_WHITELIST).permitAll()
+						// Tudo o que nao foi liberado explicitamente fica bloqueado
+						.anyRequest().denyAll());
 
 		return http.build();
-
 	}
 
 	@Bean
@@ -76,8 +79,8 @@ public class SecurityConfiguration {
 		corsConfiguration.setExposedHeaders(corsProperties.exposedHeaders());
 		corsConfiguration.setAllowedOrigins(corsProperties.allowedOrigins());
 
-		corsConfiguration.setAllowCredentials(true);
-
+		// Sem allowCredentials: a API nao usa cookie nem sessao, e allowCredentials=true
+		// junto com allowedOrigins=* faz o Spring rejeitar as requisicoes cross-origin.
 		corsConfiguration.setMaxAge(3600L);
 
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
