@@ -52,7 +52,7 @@ public class SwaggerConfig {
 				.description("Documentação da API do Spring Cloud Config Server.")
 				.version(buildProperties.getVersion() + "-" + formattedString)
 				.license(new License().name("Apache License Version 2.0")
-						.url("https://www.apache.org/licenses/LICENSE-2.0\""))
+						.url("https://www.apache.org/licenses/LICENSE-2.0"))
 				.contact(new Contact().name("JFBM").url("http://www.jfbm.tech.br").email("contato@jfbm.tech.br"));
 	}
 }
