@@ -73,8 +73,10 @@ Para projetos GitOps ou ambientes mais avançados, considere:
 
 3) Configure o properties da aplicação client, com o caminho para o certificado, e variável de ambiente com a senha do certificado (não vai colocar a senha diretamente no properties do client né???!!!)
 
-4) Use a chave pública (pem) do ambiente, gerada no passo 1, para criptografar o dado sensível, usando o endpoint /certificate/pem/encrypt no Config Server. Para criptografar basta a chave pública: a chave privada (pfx) e a senha ficam somente com a aplicação client, que é quem descriptografa. Se tiver só o pfx, recupere a chave pública pelo endpoint /certificate/pfx/public-key/export.
+4) Copie a chave pública (pem) de cada ambiente, gerada no passo 1, para o repo dos properties, na pasta da aplicação e do ambiente (ex.: properties/cloudconfigpropclient/development/cloudconfigpropclient-client-key-development.pem). A chave pública não é segredo e pode ficar no Git.
 
-5) Copie o dado criptografado (com o prefixo {cipher}) que foi gerado, para o properties da aplicação, e para o ambiente desejado. Lembrando que é o properties que fica no repo dos properties, e não diretamente em qualquer aplicação.
+5) Para criptografar o dado sensível, use o endpoint /certificate/encrypt no Config Server, informando o nome da aplicação (applicationName), o ambiente (profile) e o valor (data). O Config Server busca a chave pública no repo dos properties, então não é preciso enviar arquivo nenhum. Opcionalmente informe a branch (label); sem ela, é usada a branch padrão do Config Server. Também é possível enviar o arquivo pem direto no endpoint /certificate/pem/encrypt. Em ambos os casos basta a chave pública: a chave privada (pfx) e a senha ficam somente com a aplicação client, que é quem descriptografa. Se tiver só o pfx, recupere a chave pública pelo endpoint /certificate/pfx/public-key/export.
 
-6) Todos os exemplos do uso do dado criptografado se encontram nos meus repositórios
+6) Copie o dado criptografado (com o prefixo {cipher}) que foi gerado, para o properties da aplicação, e para o ambiente desejado. Lembrando que é o properties que fica no repo dos properties, e não diretamente em qualquer aplicação.
+
+7) Todos os exemplos do uso do dado criptografado se encontram nos meus repositórios

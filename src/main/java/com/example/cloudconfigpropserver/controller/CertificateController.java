@@ -84,6 +84,28 @@ public class CertificateController {
 		return ResponseEntity.ok(encrypted);
 	}
 
+	@Operation(summary = "Criptografa o valor informado usando a chave pública da aplicação guardada no repositório de properties,"
+			+ " em properties/{applicationName}/{profile}/{applicationName}-client-key-{profile}.pem."
+			+ " Não é preciso enviar nenhum arquivo.", tags = "Certificate", responses = {
+			@ApiResponse(responseCode = "200", description = "OK"),
+			@ApiResponse(responseCode = "400", description = "Requisição inválida.", content = @Content),
+			@ApiResponse(responseCode = "403", description = "Proibido acessar este recurso.", content = @Content),
+			@ApiResponse(responseCode = "404", description = "Chave pública ou branch não encontrada no repositório de properties.", content = @Content),
+			@ApiResponse(responseCode = "405", description = "Método HTTP não permitido.", content = @Content),
+			@ApiResponse(responseCode = "500", description = "Erro no servidor.", content = @Content) })
+	@PostMapping(value = "/encrypt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<String> encrypt(
+			@RequestPart(name = "applicationName") @Parameter(description = "Nome da aplicação (spring.application.name do properties da aplicação)", required = true) String applicationName,
+			@RequestPart(name = "profile") @Parameter(description = "Ambiente: development, staging ou production", required = true) String profile,
+			@RequestPart(name = "label", required = false) @Parameter(description = "Branch do repositório de properties. Se não informada, usa a branch padrão do servidor") String label,
+			// O valor vai no corpo da requisicao (e nao na URL) para nao ficar registrado em log de acesso
+			@RequestPart(name = "data") @Parameter(description = "Informação para criptografar", required = true) String data) {
+		var encrypted = pemService.encrypt(applicationName, profile, label == null || label.isBlank() ? null : label,
+				data);
+
+		return ResponseEntity.ok(encrypted);
+	}
+
 	@Operation(summary = "Exporta a chave pública (.pem) do arquivo pfx, para quem tiver somente o pfx."
 			+ " O alias é lido de dentro do pfx, o nome do arquivo não importa.", tags = "Certificate", responses = {
 			@ApiResponse(responseCode = "200", description = "OK"),
